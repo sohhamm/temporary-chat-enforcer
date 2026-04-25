@@ -1,9 +1,15 @@
 import {adapterForUrl} from '../adapters'
-import type {ProviderAdapter} from '../adapters/types'
+import type {AdapterId, ProviderAdapter} from '../adapters/types'
 import {createBanner, type BannerState} from '../dom/warning'
 import {installLocationWatcher, onLocationChange} from '../dom/spaNav'
 import {waitFor} from '../dom/wait'
-import {getSettings, isSiteEnabled, watchSettings, type Settings} from '../settings'
+import {
+  getSettings,
+  isSiteEnabled,
+  updateSettings,
+  watchSettings,
+  type Settings,
+} from '../settings'
 
 const DETECT_TIMEOUT_MS = 4000
 
@@ -17,7 +23,14 @@ interface EnforceContext {
 
 export async function startEnforcement() {
   let settings = await getSettings()
-  const banner = createBanner()
+  const banner = createBanner({
+    onDisableSite: async (id: AdapterId) => {
+      await updateSettings(prev => ({
+        ...prev,
+        sites: {...prev.sites, [id]: {enabled: false}},
+      }))
+    },
+  })
   let cleanupNav: (() => void) | null = null
   let activeRunId = 0
   let redirectedFromHrefs = new Set<string>()
@@ -75,18 +88,22 @@ async function runForUrl(
 ): Promise<void> {
   const {adapter, banner} = ctx
 
+  const providerId = adapter.id
+  const provider = adapter.displayName
+
   // Already on a temporary URL → confirm via DOM.
   if (adapter.isTemporaryUrl(url)) {
-    banner.update({kind: 'pending', provider: adapter.displayName})
+    banner.update({kind: 'pending', providerId, provider})
     const ok = await waitFor(() => adapter.detectActive(), DETECT_TIMEOUT_MS)
     if (!isCurrent()) return
     if (ok) {
-      banner.update({kind: 'confirmed', provider: adapter.displayName})
+      banner.update({kind: 'confirmed', providerId, provider})
     } else {
       banner.update({
         kind: 'warning',
-        provider: adapter.displayName,
-        reason: `Could not confirm temporary chat on ${adapter.displayName}.`,
+        providerId,
+        provider,
+        reason: `Could not confirm temporary chat on ${provider}.`,
       })
     }
     return
@@ -101,45 +118,48 @@ async function runForUrl(
       return
     }
     if (adapter.activateViaDom) {
-      banner.update({kind: 'pending', provider: adapter.displayName})
+      banner.update({kind: 'pending', providerId, provider})
       const attempted = await adapter.activateViaDom()
       if (!isCurrent()) return
       if (attempted) {
         const ok = await waitFor(() => adapter.detectActive(), DETECT_TIMEOUT_MS)
         if (!isCurrent()) return
         if (ok) {
-          banner.update({kind: 'confirmed', provider: adapter.displayName})
+          banner.update({kind: 'confirmed', providerId, provider})
           return
         }
       }
       banner.update({
         kind: 'warning',
-        provider: adapter.displayName,
-        reason: `Could not activate temporary chat on ${adapter.displayName}.`,
+        providerId,
+        provider,
+        reason: `Could not activate temporary chat on ${provider}.`,
       })
       return
     }
     banner.update({
       kind: 'warning',
-      provider: adapter.displayName,
-      reason: `Temporary chat is not available on ${adapter.displayName}.`,
+      providerId,
+      provider,
+      reason: `Temporary chat is not available on ${provider}.`,
     })
     return
   }
 
   // Existing chat thread that isn't temporary.
-  banner.update({kind: 'pending', provider: adapter.displayName})
+  banner.update({kind: 'pending', providerId, provider})
   const ok = await waitFor(() => adapter.detectActive(), DETECT_TIMEOUT_MS)
   if (!isCurrent()) return
   if (ok) {
-    banner.update({kind: 'confirmed', provider: adapter.displayName})
+    banner.update({kind: 'confirmed', providerId, provider})
     return
   }
   const tempUrl = adapter.buildTemporaryUrl(url) ?? undefined
   banner.update({
     kind: 'warning',
-    provider: adapter.displayName,
-    reason: `This is not a temporary chat on ${adapter.displayName}.`,
+    providerId,
+    provider,
+    reason: `This is not a temporary chat on ${provider}.`,
     actionUrl: tempUrl,
   })
 }

@@ -3,6 +3,8 @@
   "description": "Auto-enables native temporary/incognito chat mode on supported LLM web apps.",
   "private": true,
   "version": "0.0.1",
+  "license": "MIT",
+  "author": "Soham Sarkar",
   "type": "module",
   "scripts": {
     "dev": "WXT_MANUAL_BROWSER=1 wxt",

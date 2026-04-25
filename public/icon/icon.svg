@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2028"/>
+      <stop offset="1" stop-color="#0a0b0d"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.78" cy="0.82" r="0.42">
+      <stop offset="0" stop-color="#6ee49a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#6ee49a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- full bleed dark background — Chrome's pin shape masks corners -->
+  <rect x="0" y="0" width="128" height="128" fill="url(#bg)"/>
+  <circle cx="100" cy="104" r="40" fill="url(#halo)"/>
+  <text x="64" y="100"
+        text-anchor="middle"
+        font-family="Iowan Old Style, Apple Garamond, Georgia, Times New Roman, serif"
+        font-style="italic"
+        font-weight="400"
+        font-size="124"
+        fill="#ebe6dc"
+        letter-spacing="-2">t</text>
+  <circle cx="100" cy="104" r="13" fill="#6ee49a" opacity="0.28"/>
+  <circle cx="100" cy="104" r="8" fill="#6ee49a"/>
+</svg>
