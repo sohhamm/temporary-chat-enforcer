@@ -31,7 +31,8 @@ If you visit any other site, the extension does nothing.
 
 ### From source (recommended for now)
 
-The extension is not yet published to the Chrome Web Store. To run it locally:
+The extension is not yet published to the Chrome Web Store. Use Bun 1.4.4 (pinned in
+`.bun-version`) and Node.js 22.22.2+, 24.15.0+, or 26+. To run it locally:
 
 ```sh
 git clone https://github.com/<your-org>/temporary-chat-enforcer.git
@@ -44,12 +45,16 @@ Then load the unpacked extension in Chrome:
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode** (top right).
-3. Click **Load unpacked** and select `.output/chrome-mv3/` (or `dist/chrome-mv3/`, depending on
-   your WXT version).
+3. Click **Load unpacked** and select `dist/chrome-mv3/`.
 
-For Firefox: `bun run build:firefox` and load from `.output/firefox-mv2/`.
+For Firefox: `bun run build:firefox` and load from `dist/firefox-mv2/`.
+
+`bun run zip` and `bun run zip:firefox` create installable archives in `dist/`.
 
 ### Development
+
+`bun dev` starts WXT without launching a browser. Load `dist/chrome-mv3-dev/` manually;
+WXT 0.21 keeps development and production output in separate directories.
 
 ```sh
 bun dev          # Hot-reload dev server (Chrome)
