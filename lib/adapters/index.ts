@@ -15,12 +15,16 @@ export const ADAPTERS_BY_ID: Readonly<Record<AdapterId, ProviderAdapter>> = {
   gemini: geminiAdapter,
 }
 
-export function adapterForUrl(href: string): ProviderAdapter | null {
+export function adapterForUrl(href: string | URL): ProviderAdapter | null {
   let url: URL
-  try {
-    url = new URL(href)
-  } catch {
-    return null
+  if (typeof href !== 'string') {
+    url = href
+  } else {
+    try {
+      url = new URL(href)
+    } catch {
+      return null
+    }
   }
   return ADAPTERS.find(a => a.matches(url)) ?? null
 }

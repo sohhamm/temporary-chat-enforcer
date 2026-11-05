@@ -11,6 +11,11 @@ describe('adapterForUrl', () => {
     expect(adapterForUrl('https://gemini.google.com/app')?.id).toBe('gemini')
   })
 
+  it('accepts an already-parsed URL', () => {
+    expect(adapterForUrl(url('https://claude.ai/new'))?.id).toBe('claude')
+    expect(adapterForUrl(url('https://example.com/'))).toBeNull()
+  })
+
   it('returns null for unsupported hosts and invalid URLs', () => {
     expect(adapterForUrl('https://example.com/')).toBeNull()
     expect(adapterForUrl('not-a-url')).toBeNull()
