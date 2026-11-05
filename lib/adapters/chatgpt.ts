@@ -1,5 +1,7 @@
 import type {ProviderAdapter} from './types'
 
+const TEMPORARY_CHAT_RE = /temporary chat/i
+
 const TEMP_PARAM = 'temporary-chat'
 
 function hasTempParam(url: URL): boolean {
@@ -46,7 +48,7 @@ export const chatgptAdapter: ProviderAdapter = {
     // Scan all header-ish elements rather than just the first; sites often have multiple.
     const headers = document.querySelectorAll('header, [data-testid="conversation-header"]')
     for (const h of headers) {
-      if (/temporary chat/i.test(h.textContent ?? '')) return true
+      if (TEMPORARY_CHAT_RE.test(h.textContent ?? '')) return true
     }
     return false
   },
