@@ -1,6 +1,8 @@
 import {waitFor} from '../dom/wait'
 import type {ProviderAdapter} from './types'
 
+const TEMPORARY_CHAT_HEADING_RE = /^\s*temporary chat\s*$/i
+
 // Gemini has no documented URL parameter for temporary chat — activation goes through a
 // sidebar icon button. Selectors below are taken from the live page; revalidate if Google
 // rebuilds the sidebar.
@@ -42,7 +44,7 @@ function placeholderSignal(): boolean {
 function headingSignal(): boolean {
   const headings = document.querySelectorAll<HTMLElement>('h1, h2, h3, [role="heading"]')
   for (const h of headings) {
-    if (/^\s*temporary chat\s*$/i.test(h.textContent ?? '')) return true
+    if (TEMPORARY_CHAT_HEADING_RE.test(h.textContent ?? '')) return true
   }
   return false
 }

@@ -1,5 +1,7 @@
 import type {ProviderAdapter} from './types'
 
+const INCOGNITO_CHAT_RE = /incognito chat/i
+
 const INCOGNITO_PARAM = 'incognito'
 
 function hasIncognitoParam(url: URL): boolean {
@@ -47,7 +49,7 @@ export const claudeAdapter: ProviderAdapter = {
     if (hasIncognitoParam(new URL(window.location.href))) return true
     // Claude shows a header strip with a ghost icon and the text "Incognito chat" while in incognito.
     const text = document.body?.textContent ?? ''
-    if (/incognito chat/i.test(text.slice(0, 2000))) return true
+    if (INCOGNITO_CHAT_RE.test(text.slice(0, 2000))) return true
     return false
   },
 
