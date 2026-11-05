@@ -163,13 +163,15 @@ function computeView(tab: CurrentTab, settings: Settings): StateView {
     }
   }
 
+  let url: URL | null = null
+  try {
+    url = new URL(tab.url)
+  } catch {
+    url = null
+  }
+
   if (!tab.adapter) {
-    let host = ''
-    try {
-      host = new URL(tab.url).hostname
-    } catch {
-      host = tab.url
-    }
+    const host = url ? url.hostname : tab.url
     return {
       state: 'idle',
       word: 'Idle.',
@@ -184,7 +186,7 @@ function computeView(tab: CurrentTab, settings: Settings): StateView {
   }
 
   const adapter = tab.adapter
-  const host = safeHost(tab.url)
+  const host = url ? url.hostname : null
 
   if (!isSiteEnabled(settings, adapter.id)) {
     const reason = !settings.enabled
@@ -201,7 +203,7 @@ function computeView(tab: CurrentTab, settings: Settings): StateView {
 
   let isTemp = false
   try {
-    isTemp = adapter.isTemporaryUrl(new URL(tab.url))
+    isTemp = url !== null && adapter.isTemporaryUrl(url)
   } catch {
     isTemp = false
   }
@@ -240,15 +242,6 @@ function ledVariant(state: StateKey): string {
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
-}
-
-function safeHost(href: string | null): string | null {
-  if (!href) return null
-  try {
-    return new URL(href).hostname
-  } catch {
-    return null
-  }
 }
 
 function hostnameOf(adapter: ProviderAdapter): string {

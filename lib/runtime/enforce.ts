@@ -38,7 +38,7 @@ export async function startEnforcement() {
   const evaluate = async () => {
     const runId = ++activeRunId
     const url = new URL(window.location.href)
-    const adapter = adapterForUrl(url.href)
+    const adapter = adapterForUrl(url)
 
     if (!adapter) {
       banner.update({kind: 'hidden'})
