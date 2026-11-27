@@ -1,18 +1,24 @@
 import {chatgptAdapter} from './chatgpt'
 import {claudeAdapter} from './claude'
 import {geminiAdapter} from './gemini'
+import {grokAdapter} from './grok'
+import {perplexityAdapter} from './perplexity'
 import type {AdapterId, ProviderAdapter} from './types'
 
 export const ADAPTERS: readonly ProviderAdapter[] = [
   chatgptAdapter,
   claudeAdapter,
   geminiAdapter,
+  grokAdapter,
+  perplexityAdapter,
 ] as const
 
 export const ADAPTERS_BY_ID: Readonly<Record<AdapterId, ProviderAdapter>> = {
   chatgpt: chatgptAdapter,
   claude: claudeAdapter,
   gemini: geminiAdapter,
+  grok: grokAdapter,
+  perplexity: perplexityAdapter,
 }
 
 export function adapterForUrl(href: string | URL): ProviderAdapter | null {

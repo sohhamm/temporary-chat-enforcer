@@ -11,7 +11,7 @@ function hasTempParam(url: URL): boolean {
 export const chatgptAdapter: ProviderAdapter = {
   id: 'chatgpt',
   displayName: 'ChatGPT',
-  docsUrl: 'https://help.openai.com/en/articles/8914046-temporary-chats-faq',
+  hostname: 'chatgpt.com',
 
   matches(url) {
     return url.hostname === 'chatgpt.com' || url.hostname === 'www.chatgpt.com'

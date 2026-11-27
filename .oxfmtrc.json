@@ -1,0 +1,20 @@
+{
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.output/**",
+    "**/.wxt/**",
+    "**/coverage/**"
+  ],
+  "arrowParens": "avoid",
+  "bracketSpacing": false,
+  "endOfLine": "lf",
+  "jsxSingleQuote": false,
+  "printWidth": 100,
+  "proseWrap": "always",
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "all",
+  "useTabs": false
+}

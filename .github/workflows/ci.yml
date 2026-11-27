@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+
+      - name: Setup Bun
+        shell: bash
+        env:
+          BUN_VERSION: 1.4.5-canary.20261121.1
+          BUN_INTEGRITY_X64: sha512-T7q+fycJnWH7jFTXjsAKcXp49UXXL/RFROOUVxMjxDqnNeU8MB/uCreHvIENSykFQJp2d6hIeU/08PZNyvSCcg==
+          BUN_INTEGRITY_ARM64: sha512-26VPonDVYBk67i4y+3ZuuA8cWbSUgSd97KZ8JkM5canjnsyRouee1UAW19SLjpVQxxPldbJfFGSk/i1jOtXyiA==
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            x86_64) platform=x64 integrity="$BUN_INTEGRITY_X64" ;;
+            aarch64) platform=aarch64 integrity="$BUN_INTEGRITY_ARM64" ;;
+            *) echo "No pinned Bun build for $(uname -m)" >&2; exit 1 ;;
+          esac
+          install_root="$RUNNER_TEMP/bun-$BUN_VERSION"
+          tarball="$RUNNER_TEMP/bun-$BUN_VERSION.tgz"
+          curl --fail --location --retry 3 --silent --show-error --output "$tarball" \
+            "https://registry.npmjs.org/@oven/bun-linux-$platform/-/bun-linux-$platform-$BUN_VERSION.tgz"
+          actual="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 -w0)"
+          test "$actual" = "$integrity"
+          mkdir -p "$install_root"
+          tar -xzf "$tarball" -C "$install_root"
+          ln -sf bun "$install_root/package/bin/bunx"
+          echo "$install_root/package/bin" >> "$GITHUB_PATH"
+          "$install_root/package/bin/bun" --revision
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: bun audit
+
+      - name: Format and lint
+        run: bun run check
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build Chrome and Firefox packages
+        run: |
+          bun run build
+          bun run build:firefox

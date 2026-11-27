@@ -1,10 +1,6 @@
-/**
- * Patch `history.pushState` and `history.replaceState` so single-page navigations fire
- * a `tce:locationchange` event. Returns a cleanup function that restores the originals.
- */
 export function installLocationWatcher(): () => void {
-  const origPush = history.pushState
-  const origReplace = history.replaceState
+  const origPush = Reflect.get(history, 'pushState') as typeof history.pushState
+  const origReplace = Reflect.get(history, 'replaceState') as typeof history.replaceState
 
   const dispatch = () => window.dispatchEvent(new Event('tce:locationchange'))
 
