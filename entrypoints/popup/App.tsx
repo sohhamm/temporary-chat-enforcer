@@ -1,43 +1,64 @@
-import {useEffect, useState, type ReactNode} from 'react'
+import {useCallback, useEffect, useState} from 'react'
 import {ADAPTERS, adapterForUrl} from '@/lib/adapters'
-import type {AdapterId, ProviderAdapter} from '@/lib/adapters/types'
+import type {AdapterId} from '@/lib/adapters/types'
+import type {ContentRequest, EngageResponse, TabStatus} from '@/lib/messages'
+import {computePopupView, type ActiveTabSnapshot} from '@/lib/popup/view'
 import {
   getSettings,
-  isSiteEnabled,
   updateSettings,
   watchSettings,
+  type BannerMode,
   type Settings,
 } from '@/lib/settings'
+import {ProviderIcon} from './ProviderIcon'
 
-interface CurrentTab {
-  url: string | null
-  adapter: ProviderAdapter | null
+const INITIAL_TAB: ActiveTabSnapshot = {
+  loading: true,
+  tabId: null,
+  url: null,
+  adapter: null,
+  liveStatus: null,
 }
 
-type StateKey = 'active' | 'exposed' | 'off' | 'idle' | 'sensing'
-
-const MONOGRAM: Record<AdapterId, string> = {
-  chatgpt: 'Ch',
-  claude: 'Cl',
-  gemini: 'Ge',
-}
+const BANNER_MODES: readonly {value: BannerMode; label: string}[] = [
+  {value: 'always', label: 'Always'},
+  {value: 'warnings', label: 'Warnings'},
+  {value: 'off', label: 'Hidden'},
+]
 
 export function App() {
   const [settings, setSettings] = useState<Settings | null>(null)
-  const [tab, setTab] = useState<CurrentTab>({url: null, adapter: null})
+  const [tab, setTab] = useState<ActiveTabSnapshot>(INITIAL_TAB)
+  const [engaging, setEngaging] = useState(false)
 
-  useEffect(() => {
-    void getSettings().then(setSettings)
-    const stop = watchSettings(setSettings)
-    return stop
+  const refreshTab = useCallback(async () => {
+    const next = await readActiveTab()
+    setTab(next)
   }, [])
 
   useEffect(() => {
-    void readActiveTab().then(setTab)
+    let cancelled = false
+    void getSettings().then(next => {
+      if (!cancelled) setSettings(next)
+    })
+    void readActiveTab().then(next => {
+      if (!cancelled) setTab(next)
+    })
+    const stop = watchSettings(next => {
+      if (cancelled) return
+      setSettings(next)
+      void readActiveTab().then(snapshot => {
+        if (!cancelled) setTab(snapshot)
+      })
+    })
+    return () => {
+      cancelled = true
+      stop()
+    }
   }, [])
 
   if (!settings) {
-    return <div className="loading">Booting console</div>
+    return <div className="loading">Loading…</div>
   }
 
   const onToggleGlobal = async () => {
@@ -53,14 +74,45 @@ export function App() {
     setSettings(next)
   }
 
-  const enabledCount = ADAPTERS.filter(a => settings.sites[a.id]?.enabled !== false).length
+  const onSelectBannerMode = async (bannerMode: BannerMode) => {
+    const next = await updateSettings(prev => ({...prev, bannerMode}))
+    setSettings(next)
+    if (bannerMode !== 'off' && tab.tabId !== null) {
+      await sendShowBanner(tab.tabId)
+    }
+    await refreshTab()
+  }
+
+  const onRestoreBanner = async () => {
+    if (tab.tabId === null) return
+    await sendShowBanner(tab.tabId)
+    await refreshTab()
+  }
+
+  const onEngage = async (actionUrl?: string) => {
+    if (engaging) return
+    setEngaging(true)
+    try {
+      const engagedViaScript = tab.tabId !== null ? await sendEngage(tab.tabId) : false
+      if (!engagedViaScript && actionUrl && tab.tabId !== null && browser.tabs) {
+        await browser.tabs.update(tab.tabId, {url: actionUrl})
+      }
+      await refreshTab()
+    } finally {
+      setEngaging(false)
+    }
+  }
+
+  const enabledCount = settings.enabled
+    ? ADAPTERS.filter(a => settings.sites[a.id]?.enabled !== false).length
+    : 0
 
   return (
     <div className="popup">
       <header className="header">
-        <img className="mark" src="/icon/icon.svg" alt="" aria-hidden="true" />
-        <div className="title">
-          <span className="title__name">Temporary chat</span>
+        <div className="brand">
+          <img className="brand__icon" src="/icon/128.png" alt="" aria-hidden="true" />
+          <span className="brand__name">Temporary Chat</span>
         </div>
         <Toggle
           checked={settings.enabled}
@@ -69,190 +121,138 @@ export function App() {
         />
       </header>
 
-      <StateCard tab={tab} settings={settings} />
+      <div className="content">
+        <StatusCard
+          tab={tab}
+          settings={settings}
+          engaging={engaging}
+          onEngage={onEngage}
+          onRestoreBanner={onRestoreBanner}
+        />
 
-      <section className="sites-section">
-        <div className="sites-section__head">
-          <span className="sites-section__kicker">Providers</span>
-          <span className="sites-section__count">
-            {pad2(enabledCount)} / {pad2(ADAPTERS.length)} engaged
-          </span>
-        </div>
-        <ul className="sites">
-          {ADAPTERS.map(adapter => {
-            const enabled = settings.enabled && settings.sites[adapter.id]?.enabled !== false
-            return (
-              <li key={adapter.id} className={`site ${enabled ? 'site--enabled' : ''}`}>
-                <div className="site__monogram" aria-hidden="true">
-                  {MONOGRAM[adapter.id]}
-                </div>
-                <div className="site__meta">
-                  <span className="site__name">
-                    <span
-                      className={`led ${enabled ? 'led--phosphor' : 'led--off'}`}
-                      aria-hidden="true"
-                    />
-                    {adapter.displayName}
-                  </span>
-                  <span className="site__host">
-                    {hostnameOf(adapter)}
-                    <a
-                      className="site__docs"
-                      href={adapter.docsUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      docs
-                    </a>
-                  </span>
-                </div>
-                <Toggle
-                  small
-                  checked={settings.sites[adapter.id]?.enabled ?? true}
-                  onChange={() => onToggleSite(adapter.id)}
-                  ariaLabel={`Enforce on ${adapter.displayName}`}
-                  disabled={!settings.enabled}
-                />
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+        <section className="section">
+          <div className="section__head">
+            <span className="section__title">Sites</span>
+            <span className="section__meta">
+              {enabledCount} of {ADAPTERS.length} on
+            </span>
+          </div>
+          <ul className="sites">
+            {ADAPTERS.map(adapter => {
+              const checked = settings.sites[adapter.id]?.enabled ?? true
+              const active = settings.enabled && checked
+              return (
+                <li key={adapter.id} className={`site ${active ? '' : 'site--muted'}`}>
+                  <div className="site__lead">
+                    <span className="site__icon">
+                      <ProviderIcon id={adapter.id} />
+                    </span>
+                    <div className="site__info">
+                      <span className="site__name">{adapter.displayName}</span>
+                      <span className="site__sub">{adapter.hostname}</span>
+                    </div>
+                  </div>
+                  <Toggle
+                    small
+                    checked={checked}
+                    onChange={() => onToggleSite(adapter.id)}
+                    ariaLabel={`Enforce on ${adapter.displayName}`}
+                    disabled={!settings.enabled}
+                  />
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <section className="section">
+          <div className="section__head">
+            <span className="section__title">On-page badge</span>
+          </div>
+          <div className="segmented" role="radiogroup" aria-label="On-page badge visibility">
+            {BANNER_MODES.map(option => {
+              const selected = settings.bannerMode === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={`segmented__btn ${selected ? 'segmented__btn--active' : ''}`}
+                  onClick={() => void onSelectBannerMode(option.value)}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      </div>
 
       <footer className="footer">
-        <span className="footer__sig">temporary chat enforcer</span>
+        <span className="footer__note">No data collected</span>
+        <a
+          className="footer__link"
+          href="https://supercollective.studio"
+          target="_blank"
+          rel="noreferrer"
+        >
+          by Super Collective
+        </a>
       </footer>
     </div>
   )
 }
 
-function StateCard({tab, settings}: {tab: CurrentTab; settings: Settings}) {
-  const view = computeView(tab, settings)
+function StatusCard({
+  tab,
+  settings,
+  engaging,
+  onEngage,
+  onRestoreBanner,
+}: {
+  tab: ActiveTabSnapshot
+  settings: Settings
+  engaging: boolean
+  onEngage: (actionUrl?: string) => Promise<void>
+  onRestoreBanner: () => Promise<void>
+}) {
+  const view = computePopupView(tab, settings)
   return (
-    <section className="state" data-state={view.state}>
-      <div className="state__bar" aria-hidden="true" />
-      <div className="state__head">
-        <span className="state__kicker">
-          <span className={`led ${ledVariant(view.state)}`} aria-hidden="true" />
-          <span>{view.kicker}</span>
-          {view.host ? <span className="host">{view.host}</span> : null}
+    <section className="status" data-state={view.state}>
+      <div className="status__top">
+        <span className="status__title-wrap">
+          <span className="dot" aria-hidden="true" />
+          <h2 className="status__title">{view.title}</h2>
         </span>
+        {view.host ? <span className="status__host">{view.host}</span> : null}
       </div>
-      <h2 className="state__word">{view.word}</h2>
-      <p className="state__body">{view.body}</p>
+      <p className="status__body">{view.body}</p>
+      {view.canEngage || view.canRestoreBanner ? (
+        <div className="status__actions">
+          {view.canEngage ? (
+            <button
+              className="status__action"
+              type="button"
+              disabled={engaging}
+              onClick={() => void onEngage(view.actionUrl)}
+            >
+              {engaging ? 'Switching…' : (view.actionLabel ?? 'Switch to temporary chat')}
+            </button>
+          ) : null}
+          {view.canRestoreBanner ? (
+            <button
+              className="status__action status__action--secondary"
+              type="button"
+              onClick={() => void onRestoreBanner()}
+            >
+              Show badge on tab
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
-}
-
-interface StateView {
-  state: StateKey
-  word: string
-  kicker: string
-  host: string | null
-  body: ReactNode
-}
-
-function computeView(tab: CurrentTab, settings: Settings): StateView {
-  if (tab.url === null) {
-    return {
-      state: 'sensing',
-      word: 'Sensing…',
-      kicker: 'Status',
-      host: null,
-      body: 'Reading the active tab.',
-    }
-  }
-
-  let url: URL | null = null
-  try {
-    url = new URL(tab.url)
-  } catch {
-    url = null
-  }
-
-  if (!tab.adapter) {
-    const host = url ? url.hostname : tab.url
-    return {
-      state: 'idle',
-      word: 'Idle.',
-      kicker: 'Out of scope',
-      host: host || null,
-      body: (
-        <>
-          Not a supported provider. The console is dormant on <code>{host || 'this page'}</code>.
-        </>
-      ),
-    }
-  }
-
-  const adapter = tab.adapter
-  const host = url ? url.hostname : null
-
-  if (!isSiteEnabled(settings, adapter.id)) {
-    const reason = !settings.enabled
-      ? 'Master switch is off.'
-      : `Enforcement on ${adapter.displayName} is off.`
-    return {
-      state: 'off',
-      word: 'Off.',
-      kicker: adapter.displayName,
-      host,
-      body: `${reason} Toggle it on to enforce temporary chat.`,
-    }
-  }
-
-  let isTemp = false
-  try {
-    isTemp = url !== null && adapter.isTemporaryUrl(url)
-  } catch {
-    isTemp = false
-  }
-
-  if (isTemp) {
-    return {
-      state: 'active',
-      word: 'Active.',
-      kicker: adapter.displayName,
-      host,
-      body: 'Temporary chat is engaged.',
-    }
-  }
-
-  return {
-    state: 'exposed',
-    word: 'Exposed.',
-    kicker: adapter.displayName,
-    host,
-    body: 'This URL is not a temporary chat. The on-page banner can switch it.',
-  }
-}
-
-function ledVariant(state: StateKey): string {
-  switch (state) {
-    case 'active':
-      return 'led--phosphor'
-    case 'sensing':
-      return 'led--amber'
-    case 'exposed':
-      return 'led--crimson'
-    default:
-      return 'led--off'
-  }
-}
-
-function pad2(n: number): string {
-  return n.toString().padStart(2, '0')
-}
-
-function hostnameOf(adapter: ProviderAdapter): string {
-  switch (adapter.id) {
-    case 'chatgpt':
-      return 'chatgpt.com'
-    case 'claude':
-      return 'claude.ai'
-    case 'gemini':
-      return 'gemini.google.com'
-  }
 }
 
 function Toggle({
@@ -290,15 +290,55 @@ function Toggle({
   )
 }
 
-async function readActiveTab(): Promise<CurrentTab> {
+function isTabStatus(value: unknown): value is TabStatus {
+  return typeof value === 'object' && value !== null && 'kind' in value
+}
+
+async function queryContentStatus(tabId: number): Promise<TabStatus | null> {
+  if (typeof browser === 'undefined' || !browser.tabs?.sendMessage) return null
+  try {
+    const request: ContentRequest = {type: 'tce:get-status'}
+    const response: unknown = await browser.tabs.sendMessage(tabId, request)
+    return isTabStatus(response) ? response : null
+  } catch {
+    return null
+  }
+}
+
+async function sendEngage(tabId: number): Promise<boolean> {
+  if (typeof browser === 'undefined' || !browser.tabs?.sendMessage) return false
+  try {
+    const request: ContentRequest = {type: 'tce:engage'}
+    const response = (await browser.tabs.sendMessage(tabId, request)) as EngageResponse | undefined
+    return response?.ok === true
+  } catch {
+    return false
+  }
+}
+
+async function sendShowBanner(tabId: number): Promise<boolean> {
+  if (typeof browser === 'undefined' || !browser.tabs?.sendMessage) return false
+  try {
+    const request: ContentRequest = {type: 'tce:show-banner'}
+    const response = (await browser.tabs.sendMessage(tabId, request)) as EngageResponse | undefined
+    return response?.ok === true
+  } catch {
+    return false
+  }
+}
+
+async function readActiveTab(): Promise<ActiveTabSnapshot> {
   if (typeof browser === 'undefined' || !browser.tabs) {
-    return {url: null, adapter: null}
+    return {loading: false, tabId: null, url: null, adapter: null, liveStatus: null}
   }
   try {
     const [tab] = await browser.tabs.query({active: true, currentWindow: true})
+    const tabId = tab?.id ?? null
     const url = tab?.url ?? null
-    return {url, adapter: url ? adapterForUrl(url) : null}
+    const adapter = url ? adapterForUrl(url) : null
+    const liveStatus = tabId !== null && adapter ? await queryContentStatus(tabId) : null
+    return {loading: false, tabId, url, adapter, liveStatus}
   } catch {
-    return {url: null, adapter: null}
+    return {loading: false, tabId: null, url: null, adapter: null, liveStatus: null}
   }
 }

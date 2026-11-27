@@ -1,8 +1,4 @@
-/** Resolve true the first moment `predicate()` is true, or false if `timeoutMs` elapses first. */
-export function waitFor(
-  predicate: () => boolean,
-  timeoutMs = 4000,
-): Promise<boolean> {
+export function waitFor(predicate: () => boolean, timeoutMs = 4000): Promise<boolean> {
   if (predicate()) return Promise.resolve(true)
 
   return new Promise(resolve => {
@@ -11,13 +7,16 @@ export function waitFor(
       if (done) return
       done = true
       observer.disconnect()
+      clearInterval(poller)
       clearTimeout(timer)
       resolve(value)
     }
 
-    const observer = new MutationObserver(() => {
+    const check = () => {
       if (predicate()) finish(true)
-    })
+    }
+
+    const observer = new MutationObserver(check)
 
     const root = document.documentElement ?? document.body
     if (root) {
@@ -29,6 +28,7 @@ export function waitFor(
       })
     }
 
+    const poller = setInterval(check, 100)
     const timer = setTimeout(() => finish(predicate()), timeoutMs)
   })
 }

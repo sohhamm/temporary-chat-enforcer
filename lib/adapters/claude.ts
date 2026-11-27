@@ -12,7 +12,7 @@ function hasIncognitoParam(url: URL): boolean {
 export const claudeAdapter: ProviderAdapter = {
   id: 'claude',
   displayName: 'Claude',
-  docsUrl: 'https://support.claude.com/en/articles/12260368-using-incognito-chats',
+  hostname: 'claude.ai',
 
   matches(url) {
     return url.hostname === 'claude.ai' || url.hostname === 'www.claude.ai'

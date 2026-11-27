@@ -1,0 +1,18 @@
+{
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.output/**",
+    "**/.wxt/**",
+    "**/coverage/**"
+  ],
+  "plugins": ["unicorn", "typescript", "oxc", "react", "jsx-a11y"],
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "jsx-a11y/prefer-tag-over-role": "off"
+  }
+}

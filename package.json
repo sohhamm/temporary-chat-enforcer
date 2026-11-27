@@ -1,10 +1,12 @@
 {
   "name": "temporary-chat-enforcer",
-  "description": "Auto-enables native temporary/incognito chat mode on supported LLM web apps.",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.1",
+  "description": "Auto-enables native temporary/incognito chat mode on ChatGPT, Claude, Gemini, Grok, and Perplexity.",
+  "homepage": "https://github.com/sohhamm/temporary-chat-enforcer",
   "license": "MIT",
-  "author": "Soham Sarkar",
+  "author": "Super Collective <support@supercollective.studio>",
+  "repository": "github:sohhamm/temporary-chat-enforcer",
   "type": "module",
   "scripts": {
     "dev": "WXT_MANUAL_BROWSER=1 wxt",
@@ -16,31 +18,42 @@
     "build:firefox": "wxt build -b firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "typecheck": "bun check --no-script",
+    "lint": "bun lint --no-script --type-aware --type-check -c .oxlintrc.json",
+    "lint:fix": "bun lint --no-script --type-aware --type-check -c .oxlintrc.json --fix",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
+    "check": "bun fmt --check && bun run lint",
+    "fix": "bun fmt && bun run lint:fix",
+    "test": "bun test --parallel --randomize",
+    "test:watch": "bun test --watch",
     "postinstall": "wxt prepare"
-  },
-  "devDependencies": {
-    "@types/chrome": "^0.3.6",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitest/ui": "^5.0.5",
-    "@wxt-dev/module-react": "^1.2.2",
-    "jsdom": "^30.1.3",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.5",
-    "wxt": "^0.21.4",
-    "vite": "^8.3.5",
-    "web-ext": "^10.8.0"
   },
   "dependencies": {
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
-  "packageManager": "bun@1.4.4",
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "@types/chrome": "^0.3.8",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "@wxt-dev/module-react": "^1.2.2",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "web-ext": "^10.8.0",
+    "wxt": "^0.21.5"
+  },
+  "overrides": {
+    "node-forge@<1.4.3": "1.4.3"
+  },
   "engines": {
-    "bun": ">=1.4.4",
+    "bun": ">=1.4.5",
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
-  }
+  },
+  "packageManager": "bun@1.4.5",
+  "trustedDependencies": [
+    "esbuild"
+  ]
 }

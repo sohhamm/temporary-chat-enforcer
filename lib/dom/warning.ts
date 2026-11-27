@@ -10,11 +10,13 @@ export type BannerState =
       provider: string
       reason: string
       actionUrl?: string
+      canEngage?: boolean
     }
 
 export interface BannerOptions {
-  /** Called when the user flips the in-banner toggle off, asking to disable enforcement on this site. */
   onDisableSite?(id: AdapterId): void | Promise<void>
+  onEngage?(): void | Promise<void>
+  onDismiss?(): void
 }
 
 const HOST_ID = 'tce-banner-host'
@@ -25,7 +27,7 @@ const STYLES = `
 
   .root {
     position: fixed;
-    top: 0;
+    top: 10px;
     left: 0;
     right: 0;
     z-index: ${Z_INDEX};
@@ -36,150 +38,78 @@ const STYLES = `
 
   .chip {
     pointer-events: auto;
-    margin: 10px;
-    display: inline-flex;
-    align-items: stretch;
-    overflow: hidden;
-    border-radius: 8px;
-    font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-    font-size: 12px;
-    line-height: 1;
-    letter-spacing: 0;
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-    border: 1px solid rgba(235, 230, 220, 0.14);
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-      0 8px 24px rgba(0, 0, 0, 0.32),
-      0 2px 6px rgba(0, 0, 0, 0.18);
-    color: #ebe6dc;
-    background: rgba(14, 16, 20, 0.86);
-    opacity: 0;
-    transform: translateY(-6px);
-    animation: enter 280ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
-  }
-
-  @keyframes enter {
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .chip__head {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 7px 12px 7px 9px;
-    border-right: 1px solid rgba(235, 230, 220, 0.1);
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.03),
-      rgba(255, 255, 255, 0)
-    );
-  }
-
-  .chip__brand {
-    font-size: 9.5px;
-    font-weight: 500;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: rgba(235, 230, 220, 0.7);
-    line-height: 1;
-  }
-
-  .chip__tail {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 8px 7px 10px;
-  }
-
-  /* ── confirmed ── */
-  .chip[data-kind="confirmed"] {
-    border-color: rgba(110, 228, 154, 0.32);
-    box-shadow:
-      0 0 0 1px rgba(110, 228, 154, 0.12) inset,
-      0 8px 28px rgba(0, 0, 0, 0.34),
-      0 0 24px rgba(110, 228, 154, 0.18);
-    background: rgba(8, 18, 13, 0.86);
-  }
-
-  /* ── pending ── */
-  .chip[data-kind="pending"] {
-    border-color: rgba(240, 178, 101, 0.3);
-    background: rgba(20, 16, 10, 0.86);
-  }
-
-  /* ── warning ── */
-  .chip[data-kind="warning"] {
-    border-color: rgba(238, 115, 115, 0.36);
-    box-shadow:
-      0 0 0 1px rgba(238, 115, 115, 0.1) inset,
-      0 8px 28px rgba(0, 0, 0, 0.36),
-      0 0 24px rgba(238, 115, 115, 0.14);
-    background: rgba(22, 12, 12, 0.9);
-  }
-
-  /* in-banner toggle (mirrors the popup mechanical switch) */
-  .switch {
-    --w: 30px;
-    --h: 17px;
-    --pad: 2.5px;
-    position: relative;
-    width: var(--w);
-    height: var(--h);
+    gap: 8px;
+    height: 32px;
+    padding: 0 6px 0 11px;
     border-radius: 999px;
-    border: 1px solid rgba(110, 228, 154, 0.45);
-    background: rgba(110, 228, 154, 0.12);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    line-height: 1;
+    color: #f4f4f5;
+    background: rgba(24, 24, 27, 0.9);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.11);
     box-shadow:
-      0 0 8px rgba(110, 228, 154, 0.22),
-      inset 0 0 0 1px rgba(110, 228, 154, 0.04);
-    cursor: pointer;
-    transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+      0 1px 0 rgba(255, 255, 255, 0.05) inset,
+      0 6px 20px rgba(0, 0, 0, 0.28),
+      0 1px 3px rgba(0, 0, 0, 0.18);
+    -webkit-font-smoothing: antialiased;
+    animation: tce-enter 160ms ease-out;
+  }
+
+  @keyframes tce-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .chip[data-kind="warning"] {
+    background: rgba(34, 17, 18, 0.94);
+    border-color: rgba(239, 68, 68, 0.42);
+    color: #fee2e2;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: #71717a;
+  }
+
+  .chip[data-kind="confirmed"] .dot { background: #22c55e; }
+  .chip[data-kind="pending"] .dot {
+    background: #f59e0b;
+    animation: tce-pulse 1.3s ease-in-out infinite;
+  }
+  .chip[data-kind="warning"] .dot { background: #ef4444; }
+
+  @keyframes tce-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .label {
+    color: inherit;
+    white-space: nowrap;
+  }
+
+  .sep {
+    width: 1px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.12);
     flex: 0 0 auto;
   }
-
-  .switch__thumb {
-    position: absolute;
-    top: var(--pad);
-    width: calc(var(--h) - var(--pad) * 2 - 2px);
-    height: calc(var(--h) - var(--pad) * 2 - 2px);
-    border-radius: 50%;
-    background: #6ee49a;
-    box-shadow: 0 0 6px rgba(110, 228, 154, 0.7);
-    left: calc(var(--w) - var(--h) + var(--pad));
-    transition: left 200ms cubic-bezier(0.32, 1.6, 0.5, 1), background 160ms ease;
-  }
-
-  .chip[data-kind="pending"] .switch {
-    border-color: rgba(240, 178, 101, 0.45);
-    background: rgba(240, 178, 101, 0.1);
-    box-shadow: 0 0 8px rgba(240, 178, 101, 0.18);
-  }
-
-  .chip[data-kind="pending"] .switch__thumb {
-    background: #f0b265;
-    box-shadow: 0 0 6px rgba(240, 178, 101, 0.6);
-  }
-
-  .chip[data-kind="warning"] .switch {
-    border-color: rgba(238, 115, 115, 0.45);
-    background: rgba(238, 115, 115, 0.1);
-    box-shadow: 0 0 8px rgba(238, 115, 115, 0.18);
-  }
-
-  .chip[data-kind="warning"] .switch__thumb {
-    background: #ee7373;
-    box-shadow: 0 0 6px rgba(238, 115, 115, 0.6);
-  }
-
-  .switch:hover {
-    filter: brightness(1.08);
-  }
-
-  .switch:active {
-    transform: translateY(0.5px);
-  }
-
-
 
   button {
     all: unset;
@@ -188,69 +118,139 @@ const STYLES = `
     font-family: inherit;
   }
 
+  button:focus-visible {
+    outline: 2px solid #f4f4f5;
+    outline-offset: 2px;
+  }
+
   .engage {
+    height: 22px;
+    padding: 0 9px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 9px;
-    font-size: 9.5px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #ebe6dc;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(235, 230, 220, 0.18);
-    border-radius: 5px;
-    transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #18181b;
+    background: #fafafa;
+    transition: background 120ms ease;
   }
 
-  .engage::after {
-    content: "→";
-    font-family: ui-serif, Georgia, serif;
-    font-style: italic;
-    font-size: 13px;
-    letter-spacing: 0;
-    transform: translateY(-0.5px);
+  .engage:hover { background: #e4e4e7; }
+
+  .switch {
+    --w: 28px;
+    --h: 16px;
+    --pad: 2px;
+    position: relative;
+    width: var(--w);
+    height: var(--h);
+    border-radius: 999px;
+    background: #22c55e;
+    flex: 0 0 auto;
+    transition: opacity 120ms ease;
   }
 
-  .engage:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(235, 230, 220, 0.32);
-  }
+  .chip[data-kind="pending"] .switch { background: #f59e0b; }
+  .chip[data-kind="warning"] .switch { background: #ef4444; }
 
-  .engage:active { transform: translateY(1px); }
+  .switch:hover { opacity: 0.86; }
+
+  .switch__thumb {
+    position: absolute;
+    top: var(--pad);
+    left: calc(var(--w) - var(--h) + var(--pad));
+    width: calc(var(--h) - var(--pad) * 2);
+    height: calc(var(--h) - var(--pad) * 2);
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
 
   .close {
     width: 22px;
     height: 22px;
     display: inline-grid;
     place-items: center;
-    border-radius: 5px;
-    color: rgba(235, 230, 220, 0.55);
-    font-size: 14px;
+    border-radius: 50%;
+    color: rgba(244, 244, 245, 0.62);
+    font-size: 15px;
     line-height: 1;
     transition: background 120ms ease, color 120ms ease;
   }
 
   .close:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #ebe6dc;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
   }
 
-  /* Light host page tweak — keep chip dark for legibility on white pages */
   @media (prefers-color-scheme: light) {
     .chip {
+      color: #18181b;
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(24, 24, 27, 0.12);
       box-shadow:
-        0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-        0 10px 30px rgba(20, 18, 14, 0.18),
-        0 2px 6px rgba(20, 18, 14, 0.08);
+        0 1px 0 rgba(255, 255, 255, 0.7) inset,
+        0 6px 20px rgba(0, 0, 0, 0.1),
+        0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .chip[data-kind="warning"] {
+      color: #991b1b;
+      background: rgba(254, 242, 242, 0.96);
+      border-color: #fca5a5;
+    }
+
+    .sep {
+      background: rgba(24, 24, 27, 0.12);
+    }
+
+    .engage {
+      color: #ffffff;
+      background: #18181b;
+    }
+
+    .engage:hover { background: #27272a; }
+
+    .close { color: #71717a; }
+    .close:hover {
+      background: rgba(24, 24, 27, 0.08);
+      color: #18181b;
+    }
+
+    button:focus-visible {
+      outline-color: #18181b;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chip,
+    .chip[data-kind="pending"] .dot {
+      animation: none;
     }
   }
 `
 
-interface BannerHandle {
+export interface BannerHandle {
   update(state: BannerState): void
+  restore(): void
+  isDismissed(): boolean
   destroy(): void
+}
+
+function labelFor(state: Exclude<BannerState, {kind: 'hidden'}>): string {
+  switch (state.kind) {
+    case 'confirmed':
+      return 'Temporary chat'
+    case 'pending':
+      return 'Enabling temporary chat…'
+    case 'warning':
+      return 'Not a temporary chat'
+  }
+}
+
+function stateKeyFor(state: Exclude<BannerState, {kind: 'hidden'}>): string {
+  return `${state.kind}:${'reason' in state ? state.reason : ''}`
 }
 
 export function createBanner(options: BannerOptions = {}): BannerHandle {
@@ -269,9 +269,8 @@ export function createBanner(options: BannerOptions = {}): BannerHandle {
   root.className = 'root'
   shadow.appendChild(root)
 
-  // Per-session, in-memory dismissals keyed by `${kind}:${reason ?? ''}`.
-  // A page refresh resets this — the banner can come back next visit.
   const dismissed = new Set<string>()
+  let lastState: BannerState = {kind: 'hidden'}
 
   const mount = () => {
     if (!host.isConnected && document.body) {
@@ -282,12 +281,13 @@ export function createBanner(options: BannerOptions = {}): BannerHandle {
   }
 
   const render = (state: BannerState) => {
+    lastState = state
     if (state.kind === 'hidden') {
       root.replaceChildren()
       return
     }
 
-    const stateKey = `${state.kind}:${'reason' in state ? state.reason : ''}`
+    const stateKey = stateKeyFor(state)
     if (dismissed.has(stateKey)) {
       root.replaceChildren()
       return
@@ -296,11 +296,42 @@ export function createBanner(options: BannerOptions = {}): BannerHandle {
     const chip = document.createElement('div')
     chip.className = 'chip'
     chip.dataset.kind = state.kind
+    if (state.kind === 'warning') {
+      chip.title = state.reason
+      chip.setAttribute('role', 'status')
+      chip.setAttribute('aria-label', state.reason)
+    }
 
-    // Left zone: switch + label. Reads naturally "[switch] TEMP CHAT" — the
-    // toggle directly controls the labeled feature.
-    const head = document.createElement('span')
-    head.className = 'chip__head'
+    const dot = document.createElement('span')
+    dot.className = 'dot'
+    dot.setAttribute('aria-hidden', 'true')
+    chip.appendChild(dot)
+
+    const label = document.createElement('span')
+    label.className = 'label'
+    label.textContent = labelFor(state)
+    chip.appendChild(label)
+
+    if (state.kind === 'warning' && (state.actionUrl || (state.canEngage && options.onEngage))) {
+      const actionUrl = state.actionUrl
+      const action = document.createElement('button')
+      action.className = 'engage'
+      action.type = 'button'
+      action.textContent = 'Switch'
+      action.addEventListener('click', () => {
+        if (actionUrl) {
+          window.location.assign(actionUrl)
+        } else {
+          void options.onEngage?.()
+        }
+      })
+      chip.appendChild(action)
+    }
+
+    const sep = document.createElement('span')
+    sep.className = 'sep'
+    sep.setAttribute('aria-hidden', 'true')
+    chip.appendChild(sep)
 
     const providerId = state.providerId
     const switchBtn = document.createElement('button')
@@ -308,51 +339,29 @@ export function createBanner(options: BannerOptions = {}): BannerHandle {
     switchBtn.type = 'button'
     switchBtn.setAttribute('role', 'switch')
     switchBtn.setAttribute('aria-checked', 'true')
-    switchBtn.setAttribute('aria-label', `Disable enforcement on ${state.provider}`)
-    switchBtn.title = `Disable enforcement on ${state.provider}`
+    switchBtn.setAttribute('aria-label', `Pause enforcement on ${state.provider}`)
+    switchBtn.title = `Pause on ${state.provider}`
     const thumb = document.createElement('span')
     thumb.className = 'switch__thumb'
     switchBtn.appendChild(thumb)
     switchBtn.addEventListener('click', () => {
       void options.onDisableSite?.(providerId)
     })
-    head.appendChild(switchBtn)
-
-    const brand = document.createElement('span')
-    brand.className = 'chip__brand'
-    brand.textContent = 'Temp chat'
-    head.appendChild(brand)
-
-    chip.appendChild(head)
-
-    // Right zone: action(s) + dismiss.
-    const tail = document.createElement('span')
-    tail.className = 'chip__tail'
-
-    if (state.kind === 'warning' && state.actionUrl) {
-      const actionUrl = state.actionUrl
-      const action = document.createElement('button')
-      action.className = 'engage'
-      action.textContent = 'Engage'
-      action.addEventListener('click', () => {
-        window.location.assign(actionUrl)
-      })
-      tail.appendChild(action)
-    }
+    chip.appendChild(switchBtn)
 
     const close = document.createElement('button')
     close.className = 'close'
     close.type = 'button'
-    close.setAttribute('aria-label', 'Dismiss until next refresh')
-    close.title = 'Dismiss until next refresh'
+    close.setAttribute('aria-label', 'Hide badge on this tab')
+    close.title = 'Hide badge (restore from extension popup)'
     close.textContent = '×'
     close.addEventListener('click', () => {
       dismissed.add(stateKey)
       root.replaceChildren()
+      options.onDismiss?.()
     })
-    tail.appendChild(close)
+    chip.appendChild(close)
 
-    chip.appendChild(tail)
     root.replaceChildren(chip)
   }
 
@@ -372,6 +381,15 @@ export function createBanner(options: BannerOptions = {}): BannerHandle {
     update(state) {
       ensureMounted()
       render(state)
+    },
+    restore() {
+      dismissed.clear()
+      ensureMounted()
+      render(lastState)
+    },
+    isDismissed() {
+      if (lastState.kind === 'hidden') return false
+      return dismissed.has(stateKeyFor(lastState))
     },
     destroy() {
       host.remove()
